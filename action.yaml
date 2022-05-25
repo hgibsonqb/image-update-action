@@ -1,0 +1,47 @@
+name: 'image-update'
+description: 'Update image tags in a git repository using magic comments'
+inputs:
+  branch:
+    description: 'Name of branch to push updated images to'
+    required: true
+    type: string
+  path:
+    description: 'Path to apply changes'
+    required: true
+    type: string
+  policy-list: 
+    description: 'List of ImagePolicies to apply, in json format'
+    required: true
+    type: string
+outputs:
+  changes:
+runs:
+  using: composite
+  steps:
+  - name: Checkout 
+    uses: actions/checkout@v3
+  - name: Create new branch
+    run: git checkout -b ${{ github.event.inputs.branch }}
+  - name: Checkout image-update-action
+    uses: actions/checkout@v3
+      with:
+        repository: hgibsonqb/image-update-action
+        ref: main
+        path: .github/actions
+  - name: Setup Go
+    uses: actions/setup-go@v3
+    with:
+      go-version: '^1.18.2'
+  - name: Build image updater
+    run: go build -o imageupdate .
+    working-directory: .github/actions 
+  - name: Update image 
+    uses: actions/checkout@v3
+    run: .github/actions/imageupdate -path ${{ github.event.inputs.path }} -policy-list ${{ github.event.inputs.policy-list }}
+  - name: Commit and push change
+    run: |
+      git config user.name github-actions
+      git config user.email github-actions@github.com
+      git add .
+      git commit -m "Updating ${{ github.event.inputs.path }}"
+      git push origin ${{ github.event.inputs.branch }} 
